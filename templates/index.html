@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shorts Creator Ultimate 🚀</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0a0a0a; color: #e0e0e0; min-height:100vh; padding:20px; display:flex; justify-content:center; align-items:flex-start; }
+.container { max-width:1200px; width:100%; background:#111; border-radius:15px; padding:30px; box-shadow:0 10px 40px rgba(0,255,255,0.1); }
+h1 { text-align:center; font-size:2.5rem; color:#00ffff; margin-bottom:25px; text-shadow:0 0 5px #00ffff; }
+.input-section { display:flex; gap:15px; flex-wrap:wrap; margin-bottom:30px; }
+#video-url { flex:1; min-width:250px; padding:15px; border-radius:10px; border:2px solid #333; background:#1a1a1a; color:#e0e0e0; font-size:16px; transition:border 0.3s; }
+#video-url:focus { border-color:#00ffff; outline:none; }
+#process-btn { padding:15px 30px; background:#00ffff; color:#0a0a0a; border:none; border-radius:10px; cursor:pointer; font-weight:bold; font-size:16px; transition:background 0.3s, color 0.3s; }
+#process-btn:hover { background:#00cfcf; }
+.logs-section { background:#1a1a1a; border-radius:10px; padding:15px; margin-bottom:25px; max-height:250px; overflow-y:auto; border:1px solid #00ffff; }
+.logs-section h2 { margin-bottom:10px; color:#00ffff; }
+#logs li { list-style:none; padding:5px 0; border-bottom:1px dashed #333; font-size:14px; }
+.shorts-section h2 { margin-bottom:15px; color:#00ffff; }
+#shorts-list { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px, 1fr)); gap:20px; }
+.short-item { background:#1a1a1a; border-radius:12px; padding:15px; box-shadow:0 5px 20px rgba(0,255,255,0.1); transition:transform 0.3s; border:1px solid #00ffff; position:relative; }
+.short-item:hover { transform:translateY(-5px); }
+.short-item video { width:100%; border-radius:8px; margin-bottom:10px; }
+.subtitle-container {
+    position: absolute;
+    bottom: 250px;
+    width: auto;
+    text-align: center;
+    font-size: 18px;
+    font-weight: bold;
+    text-shadow: 2px 2px 6px #000;
+    pointer-events: auto; /* permite interações do mouse */
+    cursor: move; /* mostra que é arrastável */
+    padding: 2px 6px;
+    border-radius: 5px;
+}
+.color-picker { margin-top:10px; display:flex; align-items:center; gap:10px; font-size:14px; color:#00ffff; }
+@media (max-width:768px) { .input-section { flex-direction:column; } }
+</style>
+</head>
+<body>
+<div class="container">
+<h1>GUIMAN Video downloader 🚀</h1>
+<div class="input-section">
+<input type="text" id="video-url" placeholder="Cole a URL do YouTube aqui">
+<button id="process-btn">Processar Vídeo</button>
+</div>
+<div class="logs-section">
+<h2>Logs</h2>
+<ul id="logs"></ul>
+</div>
+<div class="shorts-section">
+<h2>Shorts Gerados</h2>
+<div id="shorts-list"></div>
+</div>
+</div>
+
+<script>
+const processBtn = document.getElementById('process-btn');
+const logsEl = document.getElementById('logs');
+const shortsList = document.getElementById('shorts-list');
+
+function addLog(msg){
+    const li = document.createElement('li');
+    li.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    logsEl.appendChild(li);
+    logsEl.scrollTop = logsEl.scrollHeight;
+}
+
+function makeDraggable(el){
+    let isDragging = false;
+    let offsetX=0, offsetY=0;
+    el.addEventListener('mousedown', (e)=>{
+        isDragging = true;
+        offsetX = e.clientX - el.getBoundingClientRect().left;
+        offsetY = e.clientY - el.getBoundingClientRect().top;
+        el.style.transition = "none";
+    });
+    document.addEventListener('mousemove', (e)=>{
+        if(!isDragging) return;
+        el.style.left = (e.clientX - offsetX - el.parentElement.getBoundingClientRect().left) + "px";
+        el.style.top = (e.clientY - offsetY - el.parentElement.getBoundingClientRect().top) + "px";
+    });
+    document.addEventListener('mouseup', ()=>{
+        if(isDragging) isDragging = false;
+        el.style.transition = "";
+    });
+}
+
+function addShort(short){
+    const div = document.createElement('div');
+    div.className = 'short-item';
+    div.innerHTML = `
+        <video src="${short.path}" controls></video>
+        <div class="subtitle-container">Transcription!</div>
+        <div class="color-picker">Cor do destaque: <input type="color" value="#00ffff" class="subtitle-color"></div>
+    `;
+    shortsList.appendChild(div);
+
+    const video = div.querySelector('video');
+    const subtitleEl = div.querySelector('.subtitle-container');
+    const colorInput = div.querySelector('.subtitle-color');
+    let highlightColor = colorInput.value;
+
+    makeDraggable(subtitleEl);
+    colorInput.addEventListener('input', ()=>{ highlightColor = colorInput.value; });
+
+    const SEGMENT_BLOCK_SIZE = 3;
+    video.addEventListener('timeupdate', ()=>{
+        const currentTime = video.currentTime;
+        if(!short.transcript_segments) return;
+
+        const activeSegments = short.transcript_segments.filter(
+            s => currentTime >= s.start && currentTime <= s.end
+        );
+        if(activeSegments.length === 0){
+            subtitleEl.innerHTML = '';
+            return;
+        }
+
+        const currentIndex = short.transcript_segments.indexOf(activeSegments[0]);
+        const blockStart = Math.floor(currentIndex / SEGMENT_BLOCK_SIZE) * SEGMENT_BLOCK_SIZE;
+        const blockEnd = Math.min(blockStart + SEGMENT_BLOCK_SIZE, short.transcript_segments.length);
+        const blockSegments = short.transcript_segments.slice(blockStart, blockEnd);
+
+        subtitleEl.innerHTML = blockSegments.map((s, idx) => {
+            const color = (idx === blockSegments.length - 1) ? highlightColor : "#ffffff";
+            return `<span style="color:${color}">${s.text}</span>`;
+        }).join(' ');
+    });
+}
+
+// --- LocalStorage 24h ---
+function saveVideoToLocal(videoId, data) {
+    const timestamp = Date.now();
+    const videoData = { ...data, timestamp };
+    localStorage.setItem(videoId, JSON.stringify(videoData));
+}
+
+function loadValidVideos() {
+    const videos = [];
+    const now = Date.now();
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        const video = JSON.parse(localStorage.getItem(key));
+        if (now - video.timestamp < 24 * 60 * 60 * 1000) {
+            videos.push(video);
+        } else {
+            localStorage.removeItem(key);
+        }
+    }
+    return videos;
+}
+
+// --- Processamento ---
+async function processVideo(){
+    const url = document.getElementById('video-url').value.trim();
+    if(!url){ alert("Cole a URL do YouTube!"); return; }
+    logsEl.innerHTML = ""; shortsList.innerHTML = "";
+    addLog("Enviando requisição para o servidor...");
+
+    try{
+        const response = await fetch('/process',{
+            method:'POST',
+            headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({url})
+        });
+        if(!response.ok){
+            const err = await response.json(); addLog(`Erro: ${err.error}`); return;
+        }
+        const data = await response.json();
+        addLog(`Vídeo processado: ${data.video_info.title}`);
+        
+        for(const short of data.shorts){
+            addLog(`Short criado: ${short.path.split('/').pop()}`);
+            addShort(short);
+        }
+
+        // Salva no localStorage para persistência
+        saveVideoToLocal(data.video_info.id, data);
+
+        addLog("Todos os shorts foram gerados!");
+    }catch(err){
+        addLog(`Erro na requisição: ${err}`);
+    }
+}
+
+// --- Carrega vídeos válidos ao abrir ---
+window.addEventListener('DOMContentLoaded', () => {
+    const savedVideos = loadValidVideos();
+    for (const video of savedVideos) {
+        for (const short of video.shorts){
+            addShort(short);
+        }
+    }
+});
+
+processBtn.addEventListener('click', processVideo);
+</script>
+</body>
+</html>
