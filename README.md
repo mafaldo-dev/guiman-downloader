@@ -42,12 +42,12 @@ LocalStorage no navegador para persistência temporária do usuário
 
 ⚡ Instalação
 1. Clone o repositório
-git clone https://github.com/mafaldo-dev/guiman-downloader.git
+git clone https://github.com/mafaldo-dev/guiman-downloader.git <br/>
 cd guiman-downloader
 
 2. Crie um ambiente virtual (recomendado)
-python -m venv venv
-source venv/bin/activate      # Linux/macOS
+python -m venv venv <br />
+source venv/bin/activate      # Linux/macOS <br/>
 venv\Scripts\activate         # Windows
 
 3. Instale as dependências
